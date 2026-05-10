@@ -40,11 +40,19 @@ set PYTHONIOENCODING=utf-8 && python "<skill-base>/zot.py" "出版商URL"
 
 ## Step 3：确认结果
 
-脚本输出四步结果：
-1. `Page metadata: title=..., DOI=...` — 页面元数据已提取
-2. `CrossRef enriched: ...` — CrossRef 已补全期刊信息
-3. `✓ Zotero item created: XXXXXXXX (type: journalArticle)` — 完整条目已添加
-4. `✓ PDF attached: YYYYYYYY` — PDF 已挂载
+脚本输出五步结果：
+1. **Duplicate check** — 如果库中已有（DOI/URL/标题匹配），跳过所有操作
+2. `Page metadata: title=..., DOI=...` — 页面元数据已提取
+3. `CrossRef enriched: ...` — CrossRef 已补全期刊信息
+4. `✓ Zotero item created: XXXXXXXX (type: journalArticle)` — 完整条目已添加
+5. `✓ PDF attached: YYYYYYYY` — PDF 已挂载
+
+成功完成后输出机器可读行：
+```
+ZOT_RESULT: zot_key=XXXXXXXX|att_key=YYYYYYYY|local_pdf=C:\Users\Yifan\Zotero\storage\YYYYYYYY\paper.pdf|title=Paper Title
+```
+
+`local_pdf` 指向 Zotero 本地 storage 中的 PDF 文件（需要 Zotero desktop 同步后才存在）。如果 Zotero 尚未同步，`local_pdf` 字段为空。
 
 ## 元数据解析流程
 
@@ -63,6 +71,7 @@ set PYTHONIOENCODING=utf-8 && python "<skill-base>/zot.py" "出版商URL"
 | `paper_at_home.skill_base not configured` | 路径未填 | config.yaml 填入 paper_at_home 目录的绝对路径 |
 | PDF 下载失败 | Chromium 未启动 / 出版商不支持 | 先启动 `start_browser.bat`，参考 paper_at_home 的 SKILL.md |
 | 元数据不完整 | 页面无 citation meta tags / CrossRef 无此 DOI | 条目仍会创建，可在 Zotero 中手动补充 |
+| `⊘ Duplicate found` | 库中已有该文献 | 正常行为，跳过操作。用 Zotero 查看已有条目 |
 
 # 索引
 

@@ -2,15 +2,15 @@
 
 ## What This Is
 
-A four-step paper workflow: **metadata extraction → PDF download → Zotero add → PDF attach**.
-Given a publisher URL, extracts full bibliographic metadata (via citation meta tags + CrossRef API), downloads the PDF, creates a proper Zotero `journalArticle` item, and attaches the PDF.
+A four-step paper workflow: **dedup check → metadata extraction → PDF download → Zotero add → PDF attach**.
+Given a publisher URL, checks for duplicates, extracts full bibliographic metadata (via citation meta tags + CrossRef API), downloads the PDF, creates a proper Zotero `journalArticle` item, and attaches the PDF. Outputs a machine-readable `ZOT_RESULT` line for LLM consumption.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `zot.py` | Main orchestration script. Four phases: `extract_metadata()` → `download_pdf()` → `add_to_zotero()` → `attach_pdf()`. |
-| `config.yaml` | User credentials (Zotero API key, library ID, paper_at_home path). **Gitignored.** |
+| `zot.py` | Main orchestration script. Five phases: `check_duplicate()` → `extract_metadata()` → `download_pdf()` → `add_to_zotero()` → `attach_pdf()`. |
+| `config.yaml` | User credentials (Zotero API key, library ID, storage path, paper_at_home path). **Gitignored.** |
 | `config.yaml.example` | Template — copy to `config.yaml` and fill in. |
 | `SKILL.md` | Agent-facing skill definition. |
 | `requirements.txt` | `pyzotero`, `pyyaml`, `rich`, `requests`. |
@@ -30,9 +30,12 @@ set PYTHONIOENCODING=utf-8 && python zot.py "publisher_URL"
 ## Architecture Notes
 
 - **Metadata extraction** (`extract_metadata`): Fetches page HTML with `requests`, parses `<meta name="citation_*">` tags for title/DOI/authors/journal. If DOI found, calls CrossRef API to enrich volume/issue/pages/abstract.
+- **Dedup check** (`check_duplicate`): Searches Zotero library by DOI (priority), URL, and title. Resolves attachment matches to parent items. Skips all operations if duplicate found.
 - **Zotero item creation** (`add_to_zotero`): Creates `journalArticle` with all populated fields via `pyzotero.Zotero.create_items()`. Falls back to `webpage` type only when no DOI is found.
 - **PDF download** (`download_pdf`): Delegates to `Paper_at_home/main.py` as subprocess with explicit `--config` flag (avoids CWD-relative config loading bug). Parses output with regex to extract file path (handles terminal-wrapped paths).
 - **PDF attachment** (`attach_pdf`): Uses `pyzotero.Zotero.attachment_simple()` — handles the multi-step Zotero upload protocol internally.
+- **Local path resolution**: After attach, constructs `<storage_path>/<att_key>/<filename>.pdf` from `config.yaml` `zotero.storage_path`.
+- **Machine-readable output**: Prints `ZOT_RESULT: zot_key=...|att_key=...|local_pdf=...|title=...` on its own line for LLM parsing.
 - Error resilience: if PDF download fails, still creates the Zotero item with metadata. If attachment fails, preserves both item and downloaded PDF with actionable recovery instructions.
 
 ## Key Gotchas
