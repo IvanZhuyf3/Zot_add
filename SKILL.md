@@ -1,6 +1,6 @@
 ---
 name: zot
-description: Add a paper to Zotero library, download its PDF, and attach it. Use when user says "zot URL" or wants to save a paper to Zotero with PDF. Triggers: "zot", "add to zotero", "save paper", "import paper". 输入URL或DOI，自动添加到Zotero、下载PDF、挂载附件。
+description: Add a paper to Zotero library with full metadata, download its PDF, and attach it. Use when user says "zot URL" or wants to save a paper to Zotero with PDF. Triggers: "zot", "add to zotero", "save paper", "import paper". 输入出版商URL，自动提取元数据、添加到Zotero、下载PDF、挂载附件。
 allowed-tools: Bash(uv:*), Bash(python:*)
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Bash(uv:*), Bash(python:*)
 
 - 把当前 `SKILL.md` 所在目录视为 `<skill-base>`。所有本地资源（config.yaml）从这里解析。
 - **首次使用必须先配置**：`<skill-base>/config.yaml.example` → 复制为 `config.yaml`，填入 Zotero API key 和 library ID。
-- Python 依赖：`pyzotero`, `pyyaml`, `rich`。首次使用前安装：`pip install pyzotero pyyaml rich`。
+- Python 依赖：`pyzotero`, `pyyaml`, `rich`, `requests`。首次使用前安装：`pip install pyzotero pyyaml rich requests`。
 - 执行命令时，设置 `PYTHONIOENCODING=utf-8` 避免 Windows GBK 编码问题。
 - 本工具依赖 [paper_at_home](../Paper_at_home) skill 下载 PDF。确保 Chromium 已启动（`start_browser.bat`）。
 - Zotero API key 需要写权限。在 https://www.zotero.org/settings/keys/new 创建，勾选 "Allow write access"。
@@ -27,23 +27,31 @@ cp "<skill-base>/config.yaml.example" "<skill-base>/config.yaml"
 ## Step 2：执行 zot 命令
 
 ```bash
-set PYTHONIOENCODING=utf-8 && python "<skill-base>/zot.py" "URL或DOI"
+set PYTHONIOENCODING=utf-8 && python "<skill-base>/zot.py" "出版商URL"
 ```
 
-支持的输入格式：
-- DOI：`10.1038/s41586-023-06139-9`
-- DOI URL：`https://doi.org/10.1038/s41586-023-06139-9`
-- 出版商 URL：`https://www.nature.com/articles/s41586-023-06139-9`
-- arXiv：`https://arxiv.org/abs/2301.00001`
+支持任意出版商 URL（paper_at_home 支持的出版商即可）：
+- `https://www.nature.com/articles/s41586-023-06139-9`
+- `https://opg.optica.org/oe/fulltext.cfm?uri=oe-34-10-18068`
+- `https://pubs.acs.org/doi/10.1021/...`
+- 等等
+
+**不需要手动提供 DOI**。脚本会自动从页面提取 DOI 并通过 CrossRef API 补全完整元数据。
 
 ## Step 3：确认结果
 
-脚本输出三步结果：
-1. `✓ Zotero item created: XXXXXXXX` — 条目已添加
-2. `✓ PDF downloaded: C:\path\to\file.pdf` — PDF 已下载
-3. `✓ PDF attached: YYYYYYYY` — PDF 已挂载
+脚本输出四步结果：
+1. `Page metadata: title=..., DOI=...` — 页面元数据已提取
+2. `CrossRef enriched: ...` — CrossRef 已补全期刊信息
+3. `✓ Zotero item created: XXXXXXXX (type: journalArticle)` — 完整条目已添加
+4. `✓ PDF attached: YYYYYYYY` — PDF 已挂载
 
-如果某步失败，脚本会报错并给出后续操作建议。
+## 元数据解析流程
+
+1. **页面 meta tags**：解析 `<meta name="citation_*">` 标签，提取 title、DOI、authors、journal 等
+2. **CrossRef API**：如果发现 DOI，调用 `api.crossref.org/works/{DOI}` 补全 volume、issue、pages、abstract 等字段
+3. **Zotero item**：创建 `journalArticle` 类型（有 DOI 时）或 `webpage` 类型（无 DOI 时），填充所有可用字段
+4. **失败容错**：即使 PDF 下载失败，也会先创建 Zotero 条目（保存元数据）
 
 ## 故障排查
 
@@ -54,10 +62,11 @@ set PYTHONIOENCODING=utf-8 && python "<skill-base>/zot.py" "URL或DOI"
 | `403 / Write access denied` | API key 无写权限 | 重新创建 key，勾选 write access |
 | `paper_at_home.skill_base not configured` | 路径未填 | config.yaml 填入 paper_at_home 目录的绝对路径 |
 | PDF 下载失败 | Chromium 未启动 / 出版商不支持 | 先启动 `start_browser.bat`，参考 paper_at_home 的 SKILL.md |
+| 元数据不完整 | 页面无 citation meta tags / CrossRef 无此 DOI | 条目仍会创建，可在 Zotero 中手动补充 |
 
 # 索引
 
 - 主脚本：`<skill-base>/zot.py`
 - 配置模板：`<skill-base>/config.yaml.example`
 - 实际配置（gitignored）：`<skill-base>/config.yaml`
-- 依赖的 PDF 下载 skill：`../Paper_at_home/`（SKILL.md 中 `paper_at_home.skill_base` 指向的目录）
+- 依赖的 PDF 下载 skill：`../Paper_at_home/`（config.yaml 中 `paper_at_home.skill_base` 指向的目录）
