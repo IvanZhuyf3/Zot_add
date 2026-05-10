@@ -10,7 +10,7 @@ allowed-tools: Bash(uv:*), Bash(python:*)
 - **首次使用必须先配置**：`<skill-base>/config.yaml.example` → 复制为 `config.yaml`，填入 Zotero API key 和 library ID。
 - Python 依赖：`pyzotero`, `pyyaml`, `rich`, `requests`。首次使用前安装：`pip install pyzotero pyyaml rich requests`。
 - 执行命令时，设置 `PYTHONIOENCODING=utf-8` 避免 Windows GBK 编码问题。
-- 本工具依赖 [paper_at_home](../Paper_at_home) skill 下载 PDF。确保 Chromium 已启动（`start_browser.bat`）。
+- 本工具依赖 [paper_at_home](../Paper_at_home) skill 下载 PDF。paper_at_home 会自动启动浏览器（使用 config.yaml 中的端口和 profile），无需手动启动。
 - Zotero API key 需要写权限。在 https://www.zotero.org/settings/keys/new 创建，勾选 "Allow write access"。
 
 # 工作流程
@@ -69,7 +69,7 @@ ZOT_RESULT: zot_key=XXXXXXXX|att_key=YYYYYYYY|local_pdf=C:\Users\Yifan\Zotero\st
 | `zotero.{key} not configured` | 凭据为占位符 | 填入真实值 |
 | `403 / Write access denied` | API key 无写权限 | 重新创建 key，勾选 write access |
 | `paper_at_home.skill_base not configured` | 路径未填 | config.yaml 填入 paper_at_home 目录的绝对路径 |
-| PDF 下载失败 | Chromium 未启动 / 出版商不支持 | 先启动 `start_browser.bat`，参考 paper_at_home 的 SKILL.md |
+| PDF 下载失败 | 浏览器未启动 / 出版商不支持 | paper_at_home 会自动启动浏览器，如仍失败检查 config.yaml 中的 chrome_path |
 | 元数据不完整 | 页面无 citation meta tags / CrossRef 无此 DOI | 条目仍会创建，可在 Zotero 中手动补充 |
 | `⊘ Duplicate found` | 库中已有该文献 | 正常行为，跳过操作。用 Zotero 查看已有条目 |
 

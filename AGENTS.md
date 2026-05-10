@@ -24,7 +24,7 @@ set PYTHONIOENCODING=utf-8 && python zot.py "publisher_URL"
 ## Prerequisites
 
 1. **Zotero API key** with write access → https://www.zotero.org/settings/keys/new
-2. **paper_at_home** skill set up and Chromium running (`start_browser.bat`)
+2. **paper_at_home** skill configured (browser auto-starts from config.yaml)
 3. `config.yaml` created from example and filled in
 
 ## Architecture Notes
@@ -41,7 +41,7 @@ set PYTHONIOENCODING=utf-8 && python zot.py "publisher_URL"
 ## Key Gotchas
 
 - Port 9222 may be reserved by Windows Hyper-V. Paper_at_home config uses port 19222 on this machine.
-- paper_at_home's `--config` argparse default must be `None` (not `"config.yaml"`) to avoid loading CWD-relative config when called as subprocess.
+- paper_at_home's `launch_browser()` now uses the configured port and user profile (not hardcoded 9222 / temp profile).
 - Rich terminal output wraps long PDF paths across lines — the regex uses `[\s\S]+?` to handle this.
 
 ## Conventions

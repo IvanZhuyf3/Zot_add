@@ -14,11 +14,7 @@ cp config.yaml.example config.yaml
 # 2. Install dependencies
 pip install pyzotero pyyaml rich requests
 
-# 3. Start Chromium with debug port (needed for PDF download)
-# Port 9222 may be reserved by Windows Hyper-V — use 19222 if so
-start msedge --remote-debugging-port=19222 --user-data-dir="%LOCALAPPDATA%\Microsoft\Edge\User Data"
-
-# 4. Run
+# 3. Run (browser auto-starts from paper_at_home config.yaml)
 set PYTHONIOENCODING=utf-8 && python zot.py "https://www.nature.com/articles/s41586-023-06139-9"
 ```
 
