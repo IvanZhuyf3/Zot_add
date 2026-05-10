@@ -56,9 +56,69 @@ def load_config() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Step 1: Extract metadata from URL
+# Step 0: Dedup check
 # ---------------------------------------------------------------------------
 
+def check_duplicate(meta: dict, cfg: dict) -> tuple[str | None, str | None]:
+    """Check if an item with the same DOI, URL, or title already exists in Zotero.
+
+    Returns (item_key, match_reason) if duplicate found, (None, None) otherwise.
+    """
+    from pyzotero import zotero as zotero_mod
+
+    zcfg = cfg["zotero"]
+    zot = zotero_mod.Zotero(zcfg["library_id"], zcfg.get("library_type", "user"), zcfg["api_key"])
+
+    doi = meta.get("DOI", "").lower().strip()
+    title = meta.get("title", "").strip()
+    url = meta.get("url", "").strip()
+
+    # Build search queries to try
+    queries = []
+    if title:
+        queries.append(("title", title[:60]))
+    if doi:
+        queries.append(("DOI", doi))
+    if url:
+        queries.append(("URL", url.split("?")[0][-60:]))
+
+    for label, query in queries:
+        try:
+            results = zot.items(q=query, limit=25)
+        except Exception:
+            continue
+        for item in results:
+            d = item.get("data", {})
+            itype = d.get("itemType", "")
+            item_doi = d.get("DOI", "").lower().strip()
+            item_title = d.get("title", "").strip()
+            item_url = d.get("url", "").strip()
+
+            # Check DOI match (highest confidence)
+            if doi and item_doi == doi and itype not in ("attachment", "note"):
+                return d["key"], "DOI"
+
+            # Check URL match
+            if url and item_url == url and itype not in ("attachment", "note"):
+                return d["key"], "URL"
+
+            # Check title match (exact, case-insensitive) on parent items
+            if title and item_title and item_title.lower() == title.lower() and itype not in ("attachment", "note"):
+                return d["key"], "title"
+
+            # For attachments: check title match, then resolve parent
+            if itype == "attachment" and title and item_title:
+                if item_title.lower() == title.lower():
+                    parent = d.get("parentItem", "")
+                    if parent:
+                        return parent, "title"
+
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Step 1: Extract metadata from URL
+# ---------------------------------------------------------------------------
 def extract_metadata(url: str) -> dict:
     """Fetch page HTML, parse citation meta tags, enrich via CrossRef if DOI found.
 
@@ -392,9 +452,17 @@ def main() -> None:
 
     console.print(f"\n[bold cyan]━━━ zot: {url[:80]}{'...' if len(url) > 80 else ''} ━━━[/bold cyan]\n")
 
-    # Step 1: Extract metadata
+    # Step 0: Quick dedup pre-check by URL (before fetching page metadata)
+    console.print("[bold]Step 0/4:[/bold] Checking for duplicates...")
+    # Extract minimal metadata for dedup (just need DOI/URL/title)
     console.print("[bold]Step 1/4:[/bold] Extracting metadata from page...")
     meta = extract_metadata(url)
+
+    dup_key, dup_reason = check_duplicate(meta, cfg)
+    if dup_key:
+        console.print(f"[yellow]⊘ Duplicate found:[/yellow] item [bold]{dup_key}[/bold] (matched by {dup_reason})")
+        console.print(f"[dim]  Skipping all operations. Use Zotero to view the existing item.[/dim]")
+        return
 
     # Step 2: Download PDF
     console.print(f"\n[bold]Step 2/4:[/bold] Downloading PDF via paper_at_home...")
