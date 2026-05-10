@@ -413,12 +413,24 @@ def _parse_create_response(resp: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def attach_pdf(item_key: str, pdf_path: Path, cfg: dict) -> str:
-    """Upload PDF as attachment to Zotero item. Returns attachment key."""
+    """Upload PDF via Zotero API (registers file info) and copy to local storage.
+
+    Two-step approach:
+    1. attachment_simple() uploads to Zotero API — this registers md5/mtime/filesize
+       in Zotero's cloud metadata, so Zotero desktop knows a file exists.
+    2. Copy PDF to local Zotero storage — makes the file immediately available
+       without waiting for Zotero Cloud → WebDAV round-trip.
+
+    Works with WebDAV sync: Zotero desktop sees registered file info + local file,
+    uploads to WebDAV on next sync.
+    """
+    import shutil
     from pyzotero import zotero as zotero_mod
 
     zcfg = cfg["zotero"]
     zot = zotero_mod.Zotero(zcfg["library_id"], zcfg.get("library_type", "user"), zcfg["api_key"])
 
+    # Step 1: Upload via API (registers file metadata: md5, mtime, filesize)
     resp = zot.attachment_simple([str(pdf_path)], parentid=item_key)
 
     if resp.get("success"):
@@ -431,8 +443,31 @@ def attach_pdf(item_key: str, pdf_path: Path, cfg: dict) -> str:
     else:
         raise RuntimeError(f"Unexpected attachment response: {resp}")
 
-    console.print(f"[green]✓ PDF attached:[/green] {att_key}")
+    # Step 2: Copy to local Zotero storage
+    storage_path = cfg.get("zotero", {}).get("storage_path", "")
+    if storage_path:
+        local_dir = Path(storage_path) / att_key
+        local_dir.mkdir(parents=True, exist_ok=True)
+        dest = local_dir / Path(pdf_path).name
+        shutil.copy2(str(pdf_path), str(dest))
+        console.print(f"[green]✓ PDF attached:[/green] {att_key} (local: {dest})")
+    else:
+        console.print(f"[green]✓ PDF uploaded:[/green] {att_key}")
+
     return att_key
+
+
+def resolve_local_pdf(att_key: str, cfg: dict) -> str:
+    """Resolve the local Zotero storage path for an attachment, if it exists."""
+    storage_path = cfg.get("zotero", {}).get("storage_path", "")
+    if not storage_path or not att_key:
+        return ""
+    local_dir = Path(storage_path) / att_key
+    if local_dir.exists():
+        pdfs = list(local_dir.glob("*.pdf"))
+        if pdfs:
+            return str(pdfs[0])
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -462,6 +497,28 @@ def main() -> None:
     if dup_key:
         console.print(f"[yellow]⊘ Duplicate found:[/yellow] item [bold]{dup_key}[/bold] (matched by {dup_reason})")
         console.print(f"[dim]  Skipping all operations. Use Zotero to view the existing item.[/dim]")
+        # Find existing attachment for local_pdf resolution
+        from pyzotero import zotero as zotero_mod
+        zcfg = cfg["zotero"]
+        zot = zotero_mod.Zotero(zcfg["library_id"], zcfg.get("library_type", "user"), zcfg["api_key"])
+        children = zot.children(dup_key)
+        att_key = ""
+        local_pdf = ""
+        for child in children:
+            if child["data"].get("itemType") == "attachment":
+                att_key = child["key"]
+                local_pdf = resolve_local_pdf(att_key, cfg)
+                break
+        if local_pdf:
+            console.print(f"  Local: {local_pdf}")
+        result_parts = [f"zot_key={dup_key}"]
+        if att_key:
+            result_parts.append(f"att_key={att_key}")
+        if local_pdf:
+            result_parts.append(f"local_pdf={local_pdf}")
+        result_parts.append(f"title={meta.get('title', '')[:100]}")
+        result_parts.append("dup=true")
+        print(f"ZOT_RESULT: {'|'.join(result_parts)}")
         return
 
     # Step 2: Download PDF
@@ -499,15 +556,7 @@ def main() -> None:
         sys.exit(1)
 
     # Done
-    storage_path = cfg.get("zotero", {}).get("storage_path", "")
-    local_pdf = ""
-    if storage_path and att_key:
-        # Zotero stores attachments as <storage_path>/<att_key>/<filename>
-        local_dir = Path(storage_path) / att_key
-        if local_dir.exists():
-            pdfs = list(local_dir.glob("*.pdf"))
-            if pdfs:
-                local_pdf = str(pdfs[0])
+    local_pdf = resolve_local_pdf(att_key, cfg)
 
     console.print(f"\n[bold green]━━━ Done! ━━━[/bold green]")
     console.print(f"  Item:  {item_key}")
