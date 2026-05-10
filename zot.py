@@ -166,9 +166,12 @@ def download_pdf(url: str, cfg: dict) -> Path:
 def _parse_download_output(output: str) -> Path | None:
     """Find the PDF file path from paper_at_home's console output."""
     # Match "[OK] Downloaded: path" or "[SKIP] Already exists: path"
-    m = re.search(r"(?:Downloaded|Already exists):\s*(.+\.pdf)", output)
+    # Path may wrap across lines due to terminal width, so use [\s\S]
+    m = re.search(r"(?:Downloaded|Already exists):\s*([\s\S]+?\.pdf)", output)
     if m:
-        p = Path(m.group(1).strip())
+        # Collapse whitespace/newlines from wrapped path, then strip
+        raw = re.sub(r"\s+", " ", m.group(1)).strip()
+        p = Path(raw)
         if p.exists():
             return p
     return None
