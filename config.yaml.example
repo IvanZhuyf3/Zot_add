@@ -1,0 +1,17 @@
+# Zot — Zotero Paper Workflow Configuration
+# Copy this file to config.yaml and fill in your credentials.
+
+zotero:
+  # Your Zotero user ID (numeric, from https://www.zotero.org/settings/keys)
+  library_id: "YOUR_LIBRARY_ID"
+  # API key with write permissions (create at https://www.zotero.org/settings/keys/new)
+  # Required permissions: Allow library access → Allow write access
+  api_key: "YOUR_API_KEY"
+  # "user" for personal library, "group" for group library
+  library_type: "user"
+
+paper_at_home:
+  # Absolute path to the Paper_at_home skill directory
+  skill_base: "C:\\Users\\Yifan\\OneDrive\\Opencode_workspace\\Paper_at_home"
+  # Where downloaded PDFs land (must match paper_at_home's config.yaml download.temp_dir)
+  download_dir: "C:\\Users\\Yifan\\Downloads\\temp"
