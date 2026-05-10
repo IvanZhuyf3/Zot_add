@@ -499,11 +499,30 @@ def main() -> None:
         sys.exit(1)
 
     # Done
+    storage_path = cfg.get("zotero", {}).get("storage_path", "")
+    local_pdf = ""
+    if storage_path and att_key:
+        # Zotero stores attachments as <storage_path>/<att_key>/<filename>
+        local_dir = Path(storage_path) / att_key
+        if local_dir.exists():
+            pdfs = list(local_dir.glob("*.pdf"))
+            if pdfs:
+                local_pdf = str(pdfs[0])
+
     console.print(f"\n[bold green]━━━ Done! ━━━[/bold green]")
     console.print(f"  Item:  {item_key}")
     console.print(f"  PDF:   {att_key}")
     console.print(f"  File:  {pdf_path}")
     console.print(f"  Title: {meta.get('title', '?')[:80]}")
+    if local_pdf:
+        console.print(f"  Local: {local_pdf}")
+
+    # Machine-readable result on its own line
+    result_parts = [f"zot_key={item_key}", f"att_key={att_key}"]
+    if local_pdf:
+        result_parts.append(f"local_pdf={local_pdf}")
+    result_parts.append(f"title={meta.get('title', '')[:100]}")
+    print(f"ZOT_RESULT: {'|'.join(result_parts)}")
 
 
 if __name__ == "__main__":

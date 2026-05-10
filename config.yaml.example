@@ -9,6 +9,8 @@ zotero:
   api_key: "YOUR_API_KEY"
   # "user" for personal library, "group" for group library
   library_type: "user"
+  # Local Zotero storage directory (contains <attachment_key>/<file>.pdf)
+  storage_path: "C:\\Users\\Yifan\\Zotero\\storage"
 
 paper_at_home:
   # Absolute path to the Paper_at_home skill directory
